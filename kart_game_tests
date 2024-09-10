@@ -1,0 +1,135 @@
+import pygame
+import math
+import random
+
+# Initialisation de pygame
+pygame.init()
+
+# Dimensions de la fenêtre
+WIDTH, HEIGHT = 800, 600
+window = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Jeu de voitures avec vecteurs")
+
+# Couleurs
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+RED = (255, 0, 0)
+GREEN = (0, 255, 0)
+
+# Constantes pour la voiture
+CAR_WIDTH, CAR_HEIGHT = 40, 20
+MAX_SPEED = 10
+ACCELERATION = 0.2
+FRICTION = 0.05
+TURN_SPEED = 3
+CHANGE_DECISION_PROBABILITY = 0.02  # Probabilité de changer de direction ou de vitesse à chaque frame
+VECTOR_LENGTH = 50  # Longueur des vecteurs
+
+# Classe pour la voiture
+class Car:
+    def __init__(self, x, y, controlled=False):
+        self.x = x
+        self.y = y
+        self.angle = random.uniform(0, 360) if not controlled else 0
+        self.speed = 0
+        self.velocity_x = 0
+        self.velocity_y = 0
+        self.controlled = controlled
+        self.autonomous = not controlled
+        if self.autonomous:
+            self.turn_direction = random.choice([-1, 1])
+            self.change_direction_time = random.uniform(1, 3)
+
+    def update(self):
+        if self.controlled:
+            self.x += self.velocity_x
+            self.y += self.velocity_y
+            self.speed *= (1 - FRICTION)
+        else:
+            if random.random() < CHANGE_DECISION_PROBABILITY:
+                self.turn_direction = random.choice([-1, 1])
+                self.speed = random.uniform(0, MAX_SPEED)
+                self.angle += self.turn_direction * TURN_SPEED
+            self.x += self.velocity_x
+            self.y += self.velocity_y
+
+        self.x %= WIDTH
+        self.y %= HEIGHT
+
+        self.calculate_velocity()
+
+    def accelerate(self, forward=True):
+        if self.controlled:
+            direction = 1 if forward else -1
+            self.speed += ACCELERATION * direction
+            self.speed = max(-MAX_SPEED, min(MAX_SPEED, self.speed))
+
+    def turn(self, left=True):
+        if self.controlled:
+            direction = 1 if left else -1
+            self.angle += TURN_SPEED * direction
+
+    def calculate_velocity(self):
+        rad = math.radians(self.angle)
+        self.velocity_x = self.speed * math.cos(rad)
+        self.velocity_y = -self.speed * math.sin(rad)
+
+    def draw(self, window):
+        rad = math.radians(self.angle)
+        car_surface = pygame.Surface((CAR_WIDTH, CAR_HEIGHT), pygame.SRCALPHA)
+        pygame.draw.rect(car_surface, BLACK, (0, 0, CAR_WIDTH, CAR_HEIGHT))
+        pygame.draw.rect(car_surface, RED, (CAR_WIDTH - 5, 0, 5, CAR_HEIGHT))
+        rotated_car = pygame.transform.rotate(car_surface, self.angle)
+        rect = rotated_car.get_rect(center=(self.x, self.y))
+        window.blit(rotated_car, rect.topleft)
+        self.draw_vectors(window)
+
+    def draw_vectors(self, window):
+        rad = math.radians(self.angle)
+        center_x, center_y = self.x, self.y
+        front_x = center_x + VECTOR_LENGTH * math.cos(rad)
+        front_y = center_y - VECTOR_LENGTH * math.sin(rad)
+        left_x = center_x + VECTOR_LENGTH * math.cos(rad + math.radians(90))
+        left_y = center_y - VECTOR_LENGTH * math.sin(rad + math.radians(90))
+        right_x = center_x + VECTOR_LENGTH * math.cos(rad - math.radians(90))
+        right_y = center_y - VECTOR_LENGTH * math.sin(rad - math.radians(90))
+
+        pygame.draw.line(window, GREEN, (center_x, center_y), (front_x, front_y), 1)
+        pygame.draw.line(window, GREEN, (center_x, center_y), (left_x, left_y), 1)
+        pygame.draw.line(window, GREEN, (center_x, center_y), (right_x, right_y), 1)
+
+# Fonction pour générer des positions aléatoires
+def random_position():
+    return random.randint(CAR_WIDTH, WIDTH - CAR_WIDTH), random.randint(CAR_HEIGHT, HEIGHT - CAR_HEIGHT)
+
+# Initialiser plusieurs voitures avec des positions aléatoires
+cars = [Car(*random_position(), controlled=False) for i in range(7000)]
+
+# Boucle principale du jeu
+running = True
+clock = pygame.time.Clock()
+
+while running:
+    window.fill(WHITE)
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+    keys = pygame.key.get_pressed()
+    if keys[pygame.K_UP]:
+        cars[0].accelerate(forward=True)
+    if keys[pygame.K_DOWN]:
+        cars[0].accelerate(forward=False)
+    if keys[pygame.K_LEFT]:
+        cars[0].turn(left=True)
+    if keys[pygame.K_RIGHT]:
+        cars[0].turn(left=False)
+
+    for car in cars:
+        car.update()
+        car.draw(window)
+
+    pygame.display.update()
+    clock.tick(60)
+
+pygame.quit()
